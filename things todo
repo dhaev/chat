@@ -1,0 +1,6 @@
+create sesrch api:=> done
+api to get messages based on id => done
+send message => done
+
+Ui for search messages=> done
+delete conversation ui=> partialy done. need to change the event listener

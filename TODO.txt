@@ -1,0 +1,46 @@
+
+manual login with username and password
+search for users
+create new conversations conversation
+continue existing => done
+delete whole conversation( user side only)
+
+test process with another device
+
+
+security:
+authenticate users
+encrypt messages
+
+
+
+API to create:
+
+delete whole conversation=> done
+//delete message
+delete message message for both users if sender=>done
+
+create seprate apis using conversationID, and Participants
+
+
+future features:
+
+That’s great! You’ve covered the basic CRUD (Create, Read, Update, Delete) operations for messages. Here are a few more functionalities you could consider adding to your API:
+
+Pagination: If there are a lot of messages, it might be useful to implement pagination to retrieve them in smaller chunks.
+
+Search: Allow users to search their messages based on content, sender, or date.
+
+Sort: Provide options to sort messages, for example, by date (newest or oldest first).
+
+Read Receipts: Track whether a message has been read by the recipient.
+
+Group Messages: If your application supports group conversations, you might need additional APIs to manage groups (add/remove participants, change group name, etc.).
+
+Message Reactions: Allow users to react to messages (like, love, laugh, etc.).
+
+Message Forwarding: Allow users to forward messages from one conversation to another.
+
+Rich Media: Support for sending images, videos, and other rich media in messages.
+
+Remember, the exact functionalities will depend on the requirements of your application. It’s always a good idea to start with the features that are most important for your users. Good luck with your project

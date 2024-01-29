@@ -1,0 +1,114 @@
+## Bing
+Sure, here's your revised code with input validation and sanitization using express-validator for all routes:
+
+const express = require('express');
+const router = express.Router();
+const { User, Conversation } = require("../models/user");
+const { ensureAuth } = require('../middleware/auth');
+const { check, validationResult } = require('express-validator');
+
+// Validators
+const searchQueryValidator = check('searchQuery')
+  .trim() // Remove leading and trailing whitespace
+  .escape() // Replace HTML characters (<, >, &, ', ") with their corresponding HTML entities
+  .isLength({ min: 1 }) // Ensure the query is not empty
+  .withMessage('Search query must not be empty');
+
+const participantIdValidator = check('id')
+  .trim()
+  .escape()
+  .isLength({ min: 1 })
+  .withMessage('Participant ID must not be empty');
+
+const messageIdValidator = check('messageId')
+  .trim()
+  .escape()
+  .isLength({ min: 1 })
+  .withMessage('Message ID must not be empty');
+
+router.get('/searchUsers', [searchQueryValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  try {
+    const { searchQuery } = req.query;
+    const users = await User.find({ displayName: { $regex: searchQuery, $options: 'i' } }).limit(5);
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
+  }
+});
+
+router.get('/getMessages', [ensureAuth, participantIdValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  const { user: { id: participant1Id }, query: { id: participant2Id } } = req;
+  try {
+    const history = await Conversation.findOne({
+      participants: { $all: [participant1Id, participant2Id] }},'messages'
+    );
+    if (!history || !history.messages || history.messages.length === 0) {
+      res.status(200).json(null);
+    } else {
+      res.status(200).json({ messages: history.messages });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/deleteConversation', [ensureAuth, participantIdValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  const { user: { id: participant1Id }, body: { id: participant2Id } } = req;
+  try {
+    const conversation = await Conversation.findOneAndDelete({
+      participants: { $all: [participant1Id, participant2Id] }
+    });
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    res.status(200).json({ message: 'Conversation deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/deleteMessage', [ensureAuth, participantIdValidator, messageIdValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  const { user: { id: participant1Id }, body: { id: participant2Id, messageId } } = req;
+  try {
+    const conversation = await Conversation.findOne({
+      participants: { $all: [participant1Id, participant2Id] }
+    });
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    const messageIndex = conversation.messages.findIndex(message => message._id.toString() === messageId);
+    if (messageIndex === -1) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    if (conversation.messages[messageIndex].sender.toString() !== participant1Id) {
+      return res.status(403).json({ error: 'You are not authorized to delete this message' });
+    }
+    conversation.messages.splice(messageIndex, 1);
+    await conversation.save();
+    res.status(200).json({ message: 'Message deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;
+
+In this code, I've added middleware to all routes that validates and sanitizes the necessary parameters. If the validation fails, the errors are sent in the response.
+Remember to add similar validation and sanitization to all your routes to protect your application from malicious inputs. Happy coding! 😊
