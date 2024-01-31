@@ -5,7 +5,6 @@ const jquery = require('jquery');
 const { JSDOM } = require('jsdom');
 const { ChatApp } = require('./public/js/app'); // replace with your actual file name
 
-
 jest.mock('axios', () => ({
   create: () => ({
     get: jest.fn(),

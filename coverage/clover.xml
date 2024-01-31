@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1706491358360" clover="3.2.0">
-  <project timestamp="1706491358361" name="All files">
+<coverage generated="1706573412027" clover="3.2.0">
+  <project timestamp="1706573412028" name="All files">
     <metrics statements="121" coveredstatements="87" conditionals="35" coveredconditionals="21" methods="17" coveredmethods="13" elements="173" coveredelements="121" complexity="0" loc="121" ncloc="121" packages="1" files="1" classes="1"/>
     <file name="app.js" path="C:\Users\vicab\Downloads\software\chat\public\js\app.js">
       <metrics statements="121" coveredstatements="87" conditionals="35" coveredconditionals="21" methods="17" coveredmethods="13"/>

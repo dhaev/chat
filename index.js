@@ -35,6 +35,10 @@ hbs.registerPartials(__dirname + '/public');
 hbs.registerHelper('json', function(context) {
   return btoa(JSON.stringify(context));
 });
+
+hbs.registerHelper('concat', function(arg1, arg2) {
+  return arg1 + arg2.toString();
+});
 // view engine setup
 app.set('views', path.join(__dirname, 'public'));
 app.set('view engine', 'hbs');
@@ -106,7 +110,7 @@ io.on('connection', socket => {
       if(roomName){
       
     socket.join(roomName);
-    console.log('User joined:'+ roomName);
+    // console.log('User joined:'+ roomName);
 }
     });
  
@@ -114,17 +118,17 @@ io.on('connection', socket => {
   // console.log(userId );
 
   socket.on("chatMessage", ( roomName, msg) => {
-    console.log('User received message:'+msg +" from" + roomName);
+    // console.log('User received message:'+msg +" from" + roomName);
 
     io.to(roomName).emit("message", roomName, msg, senderId);
-    console.log('User sent message:'+msg +" to" + roomName);
+    // console.log('User sent message:'+msg +" to" + roomName);
 
   });
 
   socket.on("deleteMessage", ( roomName, msg) => {
-    console.log('User received deleted message:'+msg +" from" + roomName);
+    // console.log('User received deleted message:'+msg +" from" + roomName);
     io.to(roomName).emit("deletemessage", roomName, msg);
-    console.log('User sent deleted message:'+msg +" to" + roomName);
+    // console.log('User sent deleted message:'+msg +" to" + roomName);
   });
 });
 

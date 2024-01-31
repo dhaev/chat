@@ -1,172 +1,225 @@
+// Import required modules
 const express = require('express');
 const mongoose = require('mongoose');
-const router = express.Router();
-const { User,Message, Conversation,} = require("../models/user");
-const { ensureAuth, ensureGuest } = require('../middleware/auth')
+const { check, validationResult } = require('express-validator');
 
-// // Assuming you have these models
-// const User = require('./models/User');
-// const Message = require('./models/Message');
-// const Conversation = require('./models/Conversation');
-router.get('/searchUsers', async (req, res) => {
+// Import models and middleware
+const { User, Message, Conversation } = require("../models/user");
+const { ensureAuth, ensureGuest } = require('../middleware/auth');
+
+// Initialize router
+const router = express.Router();
+
+// Validators
+const searchQueryValidator = check('searchQuery')
+  .trim() // Remove leading and trailing whitespace
+  .escape() // Replace HTML characters (<, >, &, ', ") with their corresponding HTML entities
+  .isLength({ min: 1 }) // Ensure the query is not empty
+  .withMessage('Search query must not be empty');
+
+const participantIdValidator = check('id')
+  .trim()
+  .escape()
+  .isLength({ min: 1 })
+  .withMessage('Participant ID must not be empty');
+
+  
+const messageIdValidator = check('messageId')
+.trim()
+.escape()
+.isLength({ min: 1 })
+.withMessage('messsage ID must not be empty');
+
+// Route to search users
+router.get('/searchUsers', [searchQueryValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
   try {
-    // Get the search query from the request parameters
     const { searchQuery } = req.query;
-    console.log("searchQuery :"+ searchQuery)
     // Find users that match the search query
     const users = await User.find({ displayName: { $regex: searchQuery, $options: 'i' } }).limit(5);
-
     // Send the users back in the response
     res.json(users);
   } catch (err) {
     console.error(err);
-    throw error;
     res.status(500).send('Server error');
   }
 });
 
-
-
-router.get('/getMessages', ensureAuth,async (req, res) => {
-    const participant1Id = req.user.id;
-    const participant2Id = req.query.id;
+router.get('/getMessages', [participantIdValidator], ensureAuth, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  const participant1Id = req.user.id;
+  const participant2Id = req.query.id;
+  try {
+    // Find a conversation between the two participants where participant1 is not in the exclude field of any message
+    const mess = await Conversation.findOne({
+      participants: { $all: [participant1Id, participant2Id] }},
+     'messages'
+    );
     
-    try {
-      // Find a conversation between the two participants
-      const history = await Conversation.findOne({
-        participants: { $all: [participant1Id, participant2Id] }},'messages'
-      );
-    
-      // Check if history or history.messages is null or empty
-      if (!history || !history.messages || history.messages.length === 0) {
-        res.status(200).json(null);
-      } else {
-        res.status(200).json({
-          messages: history.messages,
-        });
-      }
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
- 
+const history = mess.messages.filter(message=> !message.exclude.includes(new mongoose.Types.ObjectId(participant1Id)))
 
-  router.delete('/deleteConversation', ensureAuth, async (req, res) => {
-    const participant1Id = req.user.id;
-    const participant2Id = req.body.id;
-    // const {participant1Id, participant2Id} = req.body;
-    console.log("body: "+req.body.id)
-    console.log("query: "+req.query.id)
-    try {
-      // Find a conversation between the two participants
-      const conversation = await Conversation.findOneAndDelete({
-        participants: { $all: [participant1Id, participant2Id] }
+    if (!history) {
+      res.status(200).json(null);
+    } else {
+      res.status(200).json({
+        messages: history,
       });
-  
-      if (!conversation) {
-        return res.status(404).json({ error: 'Conversation not found' });
-      }
-  
-      res.status(200).json({ message: 'Conversation deleted successfully' });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
     }
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// Delete a conversation
+router.delete('/deleteConversationForAll', [ensureAuth, participantIdValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
-    router.delete('/deleteMessage',  ensureAuth, async (req, res) => {
-      const participant1Id = req.user.id;
-      const participant2Id = req.body.id;
-      const messageId = req.body.messageId;
+  const { id: participant2Id } = req.body;
+  const participant1Id = req.user.id;
 
-      console.log("body: "+req.query.id)
-      console.log("query: "+req.query.messageId)
-    
-    // const {participant1Id, participant2Id, messageId} = req.body;
-
-      try {
-        // Find a conversation between the two participants
-        const conversation = await Conversation.findOne({
-          participants: { $all: [participant1Id, participant2Id] }
-        });
-    
-        if (!conversation) {
-          return res.status(404).json({ error: 'Conversation not found' });
-        }
-    
-        // Find the message with the given id
-        const messageIndex = conversation.messages.findIndex(message => message._id.toString() === messageId);
-
-        
-        if (messageIndex === -1) {
-          return res.status(404).json({ error: 'Message not found' });
-        }
-            // Check if the user is the sender of the message
-
-        if (conversation.messages[messageIndex].sender.toString() !== participant1Id) {
-          return res.status(403).json({ error: 'You are not authorized to delete this message' });
-        }
-    
-        // Delete the message
-        conversation.messages.splice(messageIndex, 1);
-        await conversation.save();
-    
-        res.status(200).json({ message: 'Message deleted successfully' });
-      } catch (err) {
-        res.status(500).json({ error: err.message });
-      }
+  try {
+    const conversation = await Conversation.findOneAndDelete({
+      participants: { $all: [participant1Id, participant2Id] }
     });
-    
-    router.put('/updateMessage', ensureAuth, async (req, res) => {
-      const {participant1Id, participant2Id, messageId, newContent} = req.body;
-      //console.log(req.body);
-    
-      try {
-        // Find a conversation between the two participants
-        const conversation = await Conversation.findOne({
-          participants: { $all: [participant1Id, participant2Id] }
-        });
-    
-        if (!conversation) {
-          return res.status(404).json({ error: 'Conversation not found' });
-        }
-    
-        // Find the message with the given id
-        const messageIndex = conversation.messages.findIndex(message => message._id.toString() === messageId);
-    
-        if (messageIndex === -1) {
-          return res.status(404).json({ error: 'Message not found' });
-        }
-    
-        // Check if the user is the sender of the message
-        if (conversation.messages[messageIndex].sender.toString() !== participant1Id) {
-          return res.status(403).json({ error: 'You are not authorized to update this message' });
-        }
-    
-        // Update the message
-        conversation.messages[messageIndex].content = newContent;
-        await conversation.save();
-    
-        res.status(200).json({ message: 'Message updated successfully' });
-      } catch (err) {
-        res.status(500).json({ error: err.message });
-      }
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    res.status(200).json({ message: 'Conversation deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/deleteConversationForOne', [ensureAuth, participantIdValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { id: participant2Id } = req.body;
+  const participant1Id = req.user.id;
+
+  try {
+    const conversation = await Conversation.updateMany({
+      participants: { $all: [participant1Id, participant2Id] }},
+      { $addToSet: { 'messages.$[].exclude': participant1Id } }
+      );
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    res.status(200).json({ message: 'Conversation deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a message
+router.delete('/deleteMessageForAll', [ensureAuth, participantIdValidator, messageIdValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { id: participant2Id, messageId } = req.body;
+  const participant1Id = req.user.id;
+
+  try {
+    const conversation = await Conversation.findOneAndUpdate(
+      { participants: { $all: [participant1Id, participant2Id] } },
+      { $pull: { messages: { _id: messageId, sender: participant1Id } } }
+    );
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    await conversation.save();
+    res.status(200).json({ message: 'Message deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.delete('/deleteMessageForOne', [ensureAuth, participantIdValidator, messageIdValidator], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { id: participant2Id, messageId } = req.body;
+  const participant1Id = req.user.id;
+
+
+  try {
+    const conversation = await Conversation.findOneAndUpdate(
+      { participants: { $all: [participant1Id, participant2Id] },  'messages._id': messageId },
+      { $addToSet: { 'messages.$[].exclude': participant1Id } }
+    );
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    await conversation.save();
+    res.status(200).json({ message: 'Message deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update a message
+router.put('/updateMessage', ensureAuth, async (req, res) => {
+  const { participant1Id, participant2Id, messageId, newContent } = req.body;
+
+  try {
+    const conversation = await Conversation.findOne({
+      participants: { $all: [participant1Id, participant2Id] },
+      "messages.sender": mongoose.Types.ObjectId(participant1Id)
     });
-    
+
+    if (!conversation) {
+      return res.status(403).json({ error: 'You are not authorized to update this message' });
+    }
+
+    const messageIndex = conversation.messages.findIndex(message => message._id.equals(messageId));
+
+    if (messageIndex === -1) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    conversation.messages[messageIndex].content = newContent;
+    await conversation.save();
+
+    res.status(200).json({ message: 'Message updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Send a message
 router.post('/sendMessage', ensureAuth, async (req, res) => {
-  // const { senderId,receiverId ,content  } = req.body;
-  const { content, receiverId  } = req.body;
+  const { content, receiverId } = req.body;
   const senderId = req.user.id;
-
-
-  const messid = new mongoose.Types.ObjectId();
-
-  console.log("send messges request body :"  + req.body)
 
   try {
     // Create a new message
     const newMessage = new Message({
-      _id: messid,
+      _id: new mongoose.Types.ObjectId(),
       sender: senderId,
       receiver: receiverId,
       content: content
@@ -198,18 +251,16 @@ router.post('/sendMessage', ensureAuth, async (req, res) => {
     );
 
     // Add each other's IDs to the `contacts` field of both the sender's and the receiver's `User` documents
-
     await Promise.all([
-        User.updateOne(
-            { _id: senderId },
-            { $addToSet: { contacts: receiverId } }
-        ),
-        User.updateOne(
-            { _id: receiverId },
-            { $addToSet: { contacts: senderId } }
-        )
-        ]);
-    console.log(content);
+      User.updateOne(
+        { _id: senderId },
+        { $addToSet: { contacts: receiverId } }
+      ),
+      User.updateOne(
+        { _id: receiverId },
+        { $addToSet: { contacts: senderId } }
+      )
+    ]);
 
     res.status(200).json({ message: newMessage });
   } catch (err) {

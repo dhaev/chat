@@ -8,10 +8,10 @@ class ChatApp {
         this.profileId = null;
         this.profileName = null;
         this.searchUser = null;
-        // this.socket = io(); 
-        this.socket = require('socket.io-client')();
-        this.axios = require('axios');
-        this.apiClient = this.axios.create({
+        this.socket = null; 
+        // this.socket = require('socket.io-client')();
+        // this.axios = require('axios');
+        this.apiClient = axios.create({
             baseURL: 'http://localhost:3000', // replace with your API base URL
             withCredentials: true,
         });
@@ -32,10 +32,68 @@ class ChatApp {
         });
 
         this.searchUser.addEventListener('keyup', this.findUsers.bind(this));
-        this.chatMessages.addEventListener('mouseup', this.messageOptions.bind(this));
+        this.chatMessages.addEventListener('click', this.messageOptions.bind(this));
         this.chatForm.addEventListener('submit', this.sendMessage.bind(this));
+        this.socket = io(); 
+
+        this.socket.on('roomUsers', ({ room, users }) => {
+            outputRoomName(room);
+            outputUsers(users);
+          });
+          
+          //message from server
+          this.socket.on('message', this.socketSendMessage.bind(this));
+          
+          
+          
+          this.socket.on("deletemessage", this.socketDeleteMessage.bind(this));
+        
+   
     }
 
+
+    socketSendMessage(roomname, msg, senderId) {
+        if (roomname === this.getChatId()) {
+          console.log('message sent: ' + msg)
+          this.outputMessage(msg);
+          this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        } else {
+          // Get the child element with the specific id
+          var unreadElement = document.getElementById("unread_"+senderId);
+      
+          // If the child element is found
+          if (unreadElement) {
+            console.log('Element found');
+         
+            unreadElement.innerHTML = parseInt(unreadElement.innerHTML) + 1;
+            unreadElement.removeAttribute('hidden');
+      
+      
+          } else {
+            console.log('Element not found');
+          }
+      
+        }
+      
+        //scroll down
+       
+      }
+
+
+      socketDeleteMessage(roomname, msg) {
+        if (roomname === this.getChatId()) {
+        let element = document.getElementById(msg);
+        if (element) {
+            let parent = element.closest('.clearfix');
+            if (parent) {
+            parent.parentNode.removeChild(parent);
+            }
+        }
+        console.log("trying to delete response");  // Log the response
+    
+    
+        }
+    }
     messageOptions(event) {
         // Your existing code here
         if (event && event.target && event.target.matches('.message')) {
@@ -181,7 +239,12 @@ class ChatApp {
             response.messages.forEach(item => {
                 this.outputMessage(item);
             });
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            document.getElementById("unread_"+id).innerHTML= 0;
+            document.getElementById("unread_"+id).setAttribute("hidden","");
+            
         }
+        
     }
 
     async deletemessage(conversationId = null, messageId = null) {
@@ -189,7 +252,7 @@ class ChatApp {
         $('.popover').remove();
         let response;
         if (messageId !== null && messageId !== undefined && conversationId !== undefined && conversationId !== undefined) {
-            const endpoint = '/dashboard/deleteMessage';
+            const endpoint = '/dashboard/deleteMessageForOne';
             const data = { messageId: messageId, id: this.roomName.innerText };
             try {
                 response = await this.deleteRequest(endpoint, data);
@@ -206,7 +269,7 @@ class ChatApp {
         $('.popover').remove();
         let response;
         console.log("roomname : " + this.roomName.innerText);
-        const endpoint = '/dashboard/deleteConversation';
+        const endpoint = '/dashboard/deleteConversationForOne';
         const data = { id: this.roomName.innerText };
         try {
             response = await this.deleteRequest(endpoint, data);
@@ -219,6 +282,9 @@ class ChatApp {
         // Send message
         e.preventDefault();
         const message = e.target.elements.msg.value;
+        if (message.trim() === "" || message === null || message === undefined){
+            return
+        }
         e.target.elements.msg.value = '';
         e.target.elements.msg.focus();
         const chatId = this.getChatId();
@@ -253,8 +319,10 @@ class ChatApp {
     }
 
 
-}
-// const chatApp = new ChatApp();
-// document.addEventListener('DOMContentLoaded', () => chatApp.initialize());
 
-module.exports = {ChatApp};
+     // Get room and users
+}
+const chatApp = new ChatApp();
+document.addEventListener('DOMContentLoaded', () => chatApp.initialize());
+
+// module.exports = {ChatApp};

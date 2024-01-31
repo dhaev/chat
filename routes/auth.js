@@ -6,7 +6,7 @@ const { User} = require("../models/user");
 const genPassword = require('../config/passwordUtils').genPassword;
 
 router.get('/google',
-  passport.authenticate('google', { scope: ['profile'] }));
+  passport.authenticate('google', { scope: ['profile','email'] }));
 
 router.get('/google/callback', 
   passport.authenticate('google', { failureRedirect: '/' }),
@@ -40,7 +40,8 @@ router.post('/signup', (req, res, next) => {
   const hash = saltHash.hash;
 
   const newUser = new User({
-      email: req.body.uname, // changed 'uname' to 'username'
+      displayName: req.body.name,
+      email: req.body.email, // changed 'uname' to 'username'
       hash: hash,
       salt: salt,
   });

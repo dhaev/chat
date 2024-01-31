@@ -233,7 +233,7 @@ body{
         border-radius: 0.55rem 0.55rem 0 0
     }
     .chat-app .chat-history {
-        max-height: 75vh;
+        max-height: 70vh;
         overflow-x: auto
     }
 }
